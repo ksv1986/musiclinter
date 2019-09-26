@@ -5,6 +5,7 @@ import sys
 
 import chardet
 from colorama import Fore
+from enum import IntEnum
 
 # File extension categories
 # Using set type for fast "in" checks
@@ -31,11 +32,29 @@ IMAGES = frozenset([
     'png',
     'tiff',
 ])
+VIDEOS = frozenset([
+    'avi',
+    'm1v',
+    'm2v',
+    'mkv',
+    'mov',
+    'mp4',
+    'mpeg',
+    'mpg',
+    'vob',
+    'webm',
+    'wmv',
+])
 IGNORE = frozenset([
     '',
-    'avi',
+    'doc',
+    'docx',
     'log',
     'm3u',
+    'pdf',
+    'rtf',
+    'srt',
+    'toc',
     'txt',
 ])
 
@@ -44,10 +63,18 @@ CUE_ENCODING = frozenset([
     'ascii',
     'UTF-8-SIG',
 ])
+
 # Map to fix wrongly guessed encodings
 ENCODING_MAP = {
     'MacCyrillic': 'windows-1251'
 }
+
+# Valid cover names:
+COVER_NAMES = frozenset([
+    'cover',
+    'folder',
+    'front',
+])
 
 W = Fore.YELLOW
 I = Fore.GREEN
@@ -59,10 +86,67 @@ def fileextlow(name):
     return e[1:] if e else ''
 
 
+def filenamelow(name):
+    return os.path.splitext(name)[0].lower()
+
+
+class CueFix(IntEnum):
+    IGNORE = 0
+    CHECK = 1
+    OVERWRITE = 2
+    NEW = 3
+
+
 class Processor:
-    def __init__(self, verbose=False, recursive=False):
+    def __init__(self, verbose=False, recursive=False, fix_cue=CueFix.IGNORE):
+        # Options
         self.verbose = verbose
         self.recursive = recursive
+        # Actions
+        self.fix_cue = fix_cue
+        # Statistics
+        self.nr_dirs = 0
+        self.nr_media_dirs = 0
+        self.nr_no_media_dirs = 0
+        self.nr_compressed = 0
+        self.nr_lossless = 0
+        self.nr_lossless_dirs = 0
+        self.nr_video_files = 0
+        self.nr_cue = 0
+        self.nr_mixed_lossless_compressed = 0
+        self.nr_wrong_cue = 0
+        self.nr_lossy_cue = 0
+        self.nr_multiple_cue = 0
+        self.nr_ignored = 0
+        self.nr_no_cover = 0
+        self.nr_wrong_cover_name = 0
+        self.unknown = set()
+
+    def summary(self):
+        print(f"total dirs:    {self.nr_dirs}")
+        print(f"media dirs:    {self.nr_media_dirs}")
+        print(f"no media dirs: {self.nr_no_media_dirs}")
+        print(f"lossless dirs: {self.nr_lossless_dirs}")
+        print(f"video files:   {self.nr_video_files}")
+        print(f"cue dirs:      {self.nr_cue}")
+        print(f"mixed dirs:    {self.nr_mixed_lossless_compressed}")
+        print(f"wrong cue:     {self.nr_wrong_cue}")
+        print(f"lossy cue:     {self.nr_lossy_cue}")
+        print(f"multiple cue:  {self.nr_multiple_cue}")
+        print(f"ignored:       {self.nr_ignored}")
+        print(f"no cover:      {self.nr_no_cover}")
+        print(f"wrong cover:   {self.nr_wrong_cover_name}")
+        if self.unknown:
+            print(f"unknown: {self.unknown}")
+
+    @property
+    def warn_cue(self):
+        return self.fix_cue > CueFix.IGNORE
+
+
+def have_valid_cover_name(images):
+    lownames = {filenamelow(name) for name in images}
+    return COVER_NAMES.intersection(lownames)
 
 
 def _build_analyzer():
@@ -77,6 +161,8 @@ def _build_analyzer():
         analyzer[e] = lambda d, _ext, name: d.compressed.append(name)
     for e in IMAGES:
         analyzer[e] = lambda d, _ext, name: d.images.append(name)
+    for e in VIDEOS:
+        analyzer[e] = lambda d, _ext, name: d.videos.append(name)
 
     def _increment_ignored(d, _ext, _name):
         d.ignored += 1  # Can't use assignment in lambda
@@ -100,7 +186,11 @@ class Directory:
         self.images = []
         self.ignored = 0
         self.unknown = set()
+        self.videos = []
         self.subdirs = []
+
+    def path_to(self, name):
+        return os.path.join(self.path, name)
 
     def _analyze(self):
         """Enumerate all files in directory and sort them into categories"""
@@ -108,6 +198,43 @@ class Directory:
             for f in files:
                 self._analyze_file(fileextlow(f), f)
             break  # stop walk() from entering subdirectories
+
+        self.p.nr_dirs += 1
+        if self.lossless or self.compressed or self.videos:
+            if self.lossless or self.compressed:
+                if not self.images:
+                    print(f"{W}{self.path}{R}: no cover file")
+                    self.p.nr_no_cover += 1
+                elif not have_valid_cover_name(self.images):
+                    print(f"{W}{self.path}{R}: wrong cover names")
+                    self.p.nr_wrong_cover_name += 1
+            if self.lossless:
+                if self.compressed:
+                    self.p.nr_mixed_lossless_compressed += 1
+                else:
+                    self.p.nr_lossless_dirs += 1
+
+            if self.cue:
+                if not self.lossless:
+                    if self.p.warn_cue:
+                        print(f"{W}{self.path}{R}: cue but no lossless files")
+                    self.p.nr_lossy_cue += 1
+                elif not self.compressed:
+                    if len(self.cue) == 1:
+                        self.p.nr_cue += 1
+                    else:
+                        if self.p.warn_cue:
+                            print(f"{W}{self.path}{R}: {len(self.cue)} cue files")
+                        self.p.nr_multiple_cue += 1
+
+            self.p.nr_media_dirs += 1
+            self.p.nr_lossless += len(self.lossless)
+            self.p.nr_compressed += len(self.compressed)
+            self.p.nr_video_files += len(self.videos)
+            self.p.nr_ignored += self.ignored
+            self.p.unknown.update(self.unknown)
+        else:
+            self.p.nr_no_media_dirs += 1
 
     def _analyze_file(self, ext, name):
         """
@@ -128,10 +255,13 @@ class Directory:
 
         if self.p.recursive and self.subdirs:
             for d in self.subdirs:
-                Directory(self.p, os.path.join(self.path, d)).process()
+                Directory(self.p, self.path_to(d)).process()
 
     def _process(self):
-        pass
+        if self.p.fix_cue > CueFix.IGNORE:
+            for cue in self.cue:
+                if not process_cue(self.path_to(cue), self.lossless, self.p):
+                    self.p.nr_wrong_cue += 1
 
     def print_summary(self):
         print(f"{self.path}:")
@@ -139,59 +269,132 @@ class Directory:
         print(f"compressed: {len(self.compressed)}")
         print(f"cue: {len(self.cue)}")
         print(f"images: {len(self.images)}")
+        print(f"videos: {len(self.videos)}")
         print(f"ignored: {self.ignored}")
         print(f"dirs: {len(self.subdirs)}")
         print(f"unknown: {self.unknown}")
 
 
 def process_dir(path, **kwargs):
-    Directory(Processor(**kwargs), path).process()
+    p = Processor(**kwargs)
+    Directory(p, path).process()
+    p.summary()
 
 
-def process_cue_data(cue, files, data):
-    dirty = False
-    r = chardet.detect(data)
-    print("%s:" % (cue))
-    e = r['encoding']
+def process_cue_data(cue, files, p, data):
+    """Parse CUE file data and return True if no problems found"""
+    ok = True
+    can_fix = False
+    suffix = 'fixed'
+
+    e = chardet.detect(data)['encoding']
     encoding = ENCODING_MAP.get(e, e)
     if e not in CUE_ENCODING:
-        print(f"Invalid encoding {W}{e}{R}")
-        dirty = True
+        print(f"{W}'{cue}'{R}: Invalid encoding {W}{e}{R}")
+        ok = False
+        can_fix = True
+        suffix = 'utf8'
+
     content = data.decode(encoding)
-    for line in content.splitlines():
+
+    filename = None
+    date = None
+    for i, line in enumerate(content.splitlines()):
         line = line.strip()
+        # print(f"{I}{cue}:{i}:{R} {line}")
+
         if line.startswith('FILE'):
+            if filename:
+                nr_files = len(files)
+                print((f"{W}'{cue}'{R}:{i}: multiple {W}FILE{R} statements "
+                       f"({nr_files} files in directory)"))
+                return False
+
             parts = line.split('"')
             if len(parts) != 3:
-                raise Exception(line)
+                print(f"{W}'{cue}'{R}:{i}: cant't parse {W}FILE{R} statement")
+                return False
+
             filename = parts[1]
-            if filename not in files:
-                basename = os.path.splitext(filename)
-                for f in files:
-                    if f.startswith(basename):
-                        print(f"Invalid filename {W}{filename}{R}, shoule be {I}{f}{R}")
-                        content.replace(filename, f)
-                        filename = f
-                        dirty = True
-                        break
-                    else:
-                        raise Exception(f"{cue} for nonexistent file {filename}")
-            break
-    else:
-        raise Exception(f"cue file {cue} doesn't have FILE line")
-    if dirty:
-        linted = cue[:-3] + 'linted.cue'
-        with open(linted, 'wb') as f:
+        elif line.startswith('REM DATE '):
+            date = line.split(' ')[2]
+            if p.verbose:
+                print(f"{I}'{cue}'{R}:{i}: DATE={date}")
+
+    if not filename:
+        print(f"{W}'{cue}'{R}:{i}: FILE statement not found")
+        return False
+
+    if not filename in files:
+        # Filename specified in CUE doesn't exists.
+        # There is a lot of CUE files made for a WAV file that was
+        # converted to some lossless format.
+        # So maybe there is a compressed file with same name
+        # but different extension?
+        basename = os.path.splitext(filename)
+        for f in files:
+            if f.startswith(basename):
+                print((f"{W}'{cue}'{R}:{i}: Invalid FILE "
+                       f"{W}'{filename}'{R}, should be {I}'{f}'{R}"))
+                content = content.replace(filename, f)
+                filename = f
+                ok = False
+                can_fix = True
+                suffix = fileextlow(f)
+                break
+        else:
+            print((f"{W}'{cue}'{R}:{i}: nonexistent FILE "
+                    f"{W}'{filename}'{R}"))
+            return False
+
+    if not date:
+        print(f"{W}'{cue}'{R}:{i}: DATE statement not found")
+        ok = False
+
+    if not ok and can_fix and p.fix_cue > CueFix.CHECK:
+        if p.fix_cue == CueFix.OVERWRITE:
+            os.rename(cue, cue + '.bak')
+            new_name = cue
+        else:
+            new_name = '.'.join([cue[:-4], suffix, 'cue'])
+
+        with open(new_name, 'wb') as f:
             f.write(content.encode('UTF-8-SIG'))
-            print(f"Saved CUE file as {W}{linted}{R}")
-    else:
-        print(f"CUE file {I}{cue}{R} is {I}OK{R}")
+            print(f"Saved CUE file as {W}{new_name}{R}")
+        # Since we are counting invalid files,
+        # return False even though file was fixed.
+    elif p.verbose:
+        print(f"{I}'{cue}'{R}: CUE file is {I}OK{R}")
+    return ok
 
 
-def process_cue(cue, files):
+def process_cue(cue, files, p):
     with open(cue, 'rb') as f:
-        process_cue_data(cue, files, f.read())
+        data = f.read()
+    return process_cue_data(cue, files, p, data)
 
+
+def fix_cue(cue, **kwargs):
+    p = Processor(**kwargs)
+    p.fix_cue = kwargs.pop('fix_cue', CueFix.NEW)
+    lossless = []
+    for _, _, files in os.walk(os.path.dirname(cue)):
+        for f in files:
+            if fileextlow(f) in LOSSLESS:
+                lossless.append(f)
+        break
+    if not lossless:
+        print(f"{W}'{cue}'{R}: no lossless files in directory")
+        return False
+    return process_cue(cue, lossless, p)
+
+
+def main():
+    path = sys.argv[1]
+    if path[-4:].lower() == '.cue':
+        fix_cue(os.path.abspath(path))
+    else:
+        process_dir(path, verbose=False, recursive=True)
 
 if __name__ == '__main__':
-    process_dir(sys.argv[1], verbose=True)
+    main()
