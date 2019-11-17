@@ -98,13 +98,19 @@ class CueFix(IntEnum):
     NEW = 3
 
 
+class CoverFix(IntEnum):
+    IGNORE = 0
+    CHECK = 1
+
+
 class Processor:
-    def __init__(self, verbose=False, recursive=False, fix_cue=CueFix.IGNORE):
+    def __init__(self, verbose=False, recursive=False, fix_cue=CueFix.IGNORE, covers=CoverFix.IGNORE):
         # Options
         self.verbose = verbose
         self.recursive = recursive
         # Actions
         self.fix_cue = fix_cue
+        self.fix_covers = covers
         # Statistics
         self.nr_dirs = 0
         self.nr_media_dirs = 0
@@ -139,6 +145,10 @@ class Processor:
         print(f"wrong cover:   {self.nr_wrong_cover_name}")
         if self.unknown:
             print(f"unknown: {self.unknown}")
+
+    @property
+    def warn_covers(self):
+        return self.fix_covers > CoverFix.IGNORE
 
     @property
     def warn_cue(self):
@@ -204,10 +214,12 @@ class Directory:
         if self.lossless or self.compressed or self.videos:
             if self.lossless or self.compressed:
                 if not self.images:
-                    print(f"{W}{self.path}{R}: no cover file")
+                    if self.p.warn_covers:
+                        print(f"{W}{self.path}{R}: no cover file")
                     self.p.nr_no_cover += 1
                 elif not have_valid_cover_name(self.images):
-                    print(f"{W}{self.path}{R}: wrong cover names")
+                    if self.p.warn_covers:
+                        print(f"{W}{self.path}{R}: wrong cover names")
                     self.p.nr_wrong_cover_name += 1
             if self.lossless:
                 if self.compressed:
@@ -393,6 +405,11 @@ def parse_args():
     parser.add_argument('paths', type=str, nargs='+')
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-r', '--recursive', action='store_true')
+    covers = {
+        'ignore': CoverFix.IGNORE,
+        'check': CoverFix.CHECK,
+    }
+    parser.add_argument('--covers', choices=covers.keys(), default=CoverFix.IGNORE)
     cue = {
         'ignore': CueFix.IGNORE,
         'check': CueFix.CHECK,
