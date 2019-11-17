@@ -405,22 +405,25 @@ def parse_args():
     parser.add_argument('paths', type=str, nargs='+')
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-r', '--recursive', action='store_true')
+    default_fix = 'ignore'
     covers = {
-        'ignore': CoverFix.IGNORE,
+        default_fix: CoverFix.IGNORE,
         'check': CoverFix.CHECK,
     }
-    parser.add_argument('--covers', choices=covers.keys(), default=CoverFix.IGNORE)
+    parser.add_argument('--covers', choices=covers.keys(), default=default_fix)
     cue = {
-        'ignore': CueFix.IGNORE,
+        default_fix: CueFix.IGNORE,
         'check': CueFix.CHECK,
         'overwrite': CueFix.OVERWRITE,
         'new': CueFix.NEW,
     }
-    parser.add_argument('--cue', dest='fix_cue', choices=cue.keys(), default=CueFix.IGNORE)
+    parser.add_argument('--cue', dest='fix_cue', choices=cue.keys(), default=default_fix)
     args = parser.parse_args()
     paths = args.paths
     args = vars(args)
     del args['paths']
+    args['fix_cue'] = cue[args['fix_cue']]
+    args['covers'] = covers[args['covers']]
     return paths, args
 
 
