@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 
@@ -374,9 +375,7 @@ def process_cue(cue, files, p):
     return process_cue_data(cue, files, p, data)
 
 
-def fix_cue(cue, **kwargs):
-    p = Processor(**kwargs)
-    p.fix_cue = kwargs.pop('fix_cue', CueFix.NEW)
+def fix_cue(cue, p):
     lossless = []
     for _, _, files in os.walk(os.path.dirname(cue)):
         for f in files:
@@ -389,12 +388,36 @@ def fix_cue(cue, **kwargs):
     return process_cue(cue, lossless, p)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('paths', type=str, nargs='+')
+    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-r', '--recursive', action='store_true')
+    cue = {
+        'ignore': CueFix.IGNORE,
+        'check': CueFix.CHECK,
+        'overwrite': CueFix.OVERWRITE,
+        'new': CueFix.NEW,
+    }
+    parser.add_argument('--cue', dest='fix_cue', choices=cue.keys(), default=CueFix.IGNORE)
+    args = parser.parse_args()
+    paths = args.paths
+    args = vars(args)
+    del args['paths']
+    return paths, args
+
+
 def main():
-    path = sys.argv[1]
-    if path[-4:].lower() == '.cue':
-        fix_cue(os.path.abspath(path))
-    else:
-        process_dir(path, verbose=False, recursive=True)
+    paths, args = parse_args()
+    p = Processor(**args)
+    for path in paths:
+        if path[-4:].lower() == '.cue':
+            fix_cue(os.path.abspath(path), p)
+        else:
+            Directory(p, path).process()
+    print('')
+    p.summary()
+
 
 if __name__ == '__main__':
     main()
