@@ -104,10 +104,11 @@ class CoverFix(IntEnum):
 
 
 class Processor:
-    def __init__(self, verbose=False, recursive=False, fix_cue=CueFix.IGNORE, covers=CoverFix.IGNORE):
+    def __init__(self, verbose=False, recursive=False, sort=False, fix_cue=CueFix.IGNORE, covers=CoverFix.IGNORE):
         # Options
         self.verbose = verbose
         self.recursive = recursive
+        self.sort = sort
         # Actions
         self.fix_cue = fix_cue
         self.fix_covers = covers
@@ -206,6 +207,9 @@ class Directory:
     def _analyze(self):
         """Enumerate all files in directory and sort them into categories"""
         for _, self.subdirs, files in os.walk(self.path):
+            if self.p.sort:
+                self.subdirs.sort()
+                files.sort()
             for f in files:
                 self._analyze_file(fileextlow(f), f)
             break  # stop walk() from entering subdirectories
@@ -390,6 +394,8 @@ def process_cue(cue, files, p):
 def fix_cue(cue, p):
     lossless = []
     for _, _, files in os.walk(os.path.dirname(cue)):
+        if p.sort:
+            files.sort()
         for f in files:
             if fileextlow(f) in LOSSLESS:
                 lossless.append(f)
@@ -405,6 +411,7 @@ def parse_args():
     parser.add_argument('paths', type=str, nargs='+')
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-r', '--recursive', action='store_true')
+    parser.add_argument('-s', '--sort', action='store_true')
     default_fix = 'ignore'
     covers = {
         default_fix: CoverFix.IGNORE,
