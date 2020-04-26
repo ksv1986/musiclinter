@@ -307,7 +307,7 @@ def process_cue_data(cue, files, p, data):
     e = chardet.detect(data)['encoding']
     encoding = ENCODING_MAP.get(e, e)
     if e not in CUE_ENCODING:
-        print(f"{W}'{cue}'{R}: Invalid encoding {W}{e}{R}")
+        print(f"{W}{cue}{R}: Invalid encoding {W}{e}{R}")
         ok = False
         can_fix = True
         suffix = 'utf8'
@@ -323,23 +323,23 @@ def process_cue_data(cue, files, p, data):
         if line.startswith('FILE'):
             if filename:
                 nr_files = len(files)
-                print((f"{W}'{cue}'{R}:{i}: multiple {W}FILE{R} statements "
+                print((f"{W}{cue}{R}:{i}: multiple {W}FILE{R} statements "
                        f"({nr_files} files in directory)"))
                 return False
 
             parts = line.split('"')
             if len(parts) != 3:
-                print(f"{W}'{cue}'{R}:{i}: cant't parse {W}FILE{R} statement")
+                print(f"{W}{cue}{R}:{i}: cant't parse {W}FILE{R} statement")
                 return False
 
             filename = parts[1]
         elif line.startswith('REM DATE '):
             date = line.split(' ')[2]
             if p.verbose:
-                print(f"{I}'{cue}'{R}:{i}: DATE={date}")
+                print(f"{I}{cue}{R}:{i}: DATE={date}")
 
     if not filename:
-        print(f"{W}'{cue}'{R}:{i}: FILE statement not found")
+        print(f"{W}{cue}{R}:{i}: FILE statement not found")
         return False
 
     if not filename in files:
@@ -351,7 +351,7 @@ def process_cue_data(cue, files, p, data):
         basename = os.path.splitext(filename)
         for f in files:
             if f.startswith(basename):
-                print((f"{W}'{cue}'{R}:{i}: Invalid FILE "
+                print((f"{W}{cue}{R}:{i}: Invalid FILE "
                        f"{W}'{filename}'{R}, should be {I}'{f}'{R}"))
                 content = content.replace(filename, f)
                 filename = f
@@ -360,12 +360,12 @@ def process_cue_data(cue, files, p, data):
                 suffix = fileextlow(f)
                 break
         else:
-            print((f"{W}'{cue}'{R}:{i}: nonexistent FILE "
+            print((f"{W}{cue}{R}:{i}: nonexistent FILE "
                     f"{W}'{filename}'{R}"))
             return False
 
     if not date:
-        print(f"{W}'{cue}'{R}:{i}: DATE statement not found")
+        print(f"{W}{cue}{R}:{i}: DATE statement not found")
         ok = False
 
     if not ok and can_fix and p.fix_cue > CueFix.CHECK:
@@ -381,7 +381,7 @@ def process_cue_data(cue, files, p, data):
         # Since we are counting invalid files,
         # return False even though file was fixed.
     elif p.verbose:
-        print(f"{I}'{cue}'{R}: CUE file is {I}OK{R}")
+        print(f"{I}{cue}{R}: CUE file is {I}OK{R}")
     return ok
 
 
@@ -401,7 +401,7 @@ def fix_cue(cue, p):
                 lossless.append(f)
         break
     if not lossless:
-        print(f"{W}'{cue}'{R}: no lossless files in directory")
+        print(f"{W}{cue}{R}: no lossless files in directory")
         return False
     return process_cue(cue, lossless, p)
 
