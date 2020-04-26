@@ -2,7 +2,9 @@
 
 import argparse
 import os
+import re
 import sys
+from datetime import datetime
 
 import chardet
 from colorama import Fore
@@ -80,6 +82,23 @@ COVER_NAMES = frozenset([
 W = Fore.YELLOW
 I = Fore.GREEN
 R = Fore.RESET
+
+
+def string_to_years(s):
+    """Find all numbers that look like year in given string"""
+    pattern = r'\d\d\d\d'
+    r = re.compile(pattern)
+    min_year = 1960
+    max_year = datetime.now().year + 1
+    return list(filter(lambda y: y >= min_year and y <= max_year, map(int, r.findall(s))))
+
+
+def guess_year(path, verbose=False):
+    name = os.path.basename(path)
+    years = string_to_years(name)
+    if verbose:
+        print(f"{I}{name}{R} -> {years}")
+    return years[0] if len(years) == 1 else None
 
 
 def fileextlow(name):
@@ -262,6 +281,9 @@ class Directory:
         f = self._analyzer.get(ext, lambda d, ext, _: d.unknown.add(ext))
         f(self, ext, name)
 
+    def _guess_year(self):
+        return guess_year(self.path)
+
     def process(self):
         self._analyze()
 
@@ -316,6 +338,7 @@ def process_cue_data(cue, files, p, data):
 
     filename = None
     date = None
+    guessed_date = None
     for i, line in enumerate(content.splitlines()):
         line = line.strip()
         # print(f"{I}{cue}:{i}:{R} {line}")
@@ -366,6 +389,10 @@ def process_cue_data(cue, files, p, data):
 
     if not date:
         print(f"{W}{cue}{R}:{i}: DATE statement not found")
+        guessed_date = guess_year(os.path.dirname(cue))
+        if guessed_date:
+            if p.verbose:
+                print(f"{I}{cue}{R}: DATE {guessed_date} guessed from directory name")
         ok = False
 
     if not ok and can_fix and p.fix_cue > CueFix.CHECK:
@@ -374,6 +401,9 @@ def process_cue_data(cue, files, p, data):
             new_name = cue
         else:
             new_name = '.'.join([cue[:-4], suffix, 'cue'])
+
+        if not date and guessed_date:
+            content = f"REM DATE {guessed_date}\n" + content
 
         with open(new_name, 'wb') as f:
             f.write(content.encode('UTF-8-SIG'))
