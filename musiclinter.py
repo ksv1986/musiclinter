@@ -122,7 +122,35 @@ class CoverFix(IntEnum):
     CHECK = 1
 
 
+def _prepare_print_template(template):
+    """Calculates and saves length of each caption"""
+    return tuple(map(lambda t: (t[0], len(t[0]), t[1]), template))
+
+
 class Processor:
+    _print_template = _prepare_print_template((
+        ('video files', 'nr_video_files'),
+        ('cue dirs', 'nr_cue'),
+        ('mixed dirs', 'nr_mixed_lossless_compressed'),
+        ('wrong cue', 'nr_wrong_cue'),
+        ('lossy cue', 'nr_lossy_cue'),
+        ('multiple cue','nr_multiple_cue'),
+        ('ignored', 'nr_ignored'),
+        ('no cover', 'nr_no_cover'),
+        ('wrong cover', 'nr_wrong_cover_name'),
+        ('unknown', 'unknown'),
+        ('media dirs', 'nr_media_dirs'),
+        ('no media dirs', 'nr_no_media_dirs'),
+        ('lossless dirs', 'nr_lossless_dirs'),
+        ('total dirs', 'nr_dirs'),
+    ))
+    """
+    Template for printing summary: caption, field, caption length.
+    Order of entries defines order of printing.
+    """
+    _print_max = max(map(lambda t: t[1], _print_template))
+    """Maximal caption length, used for vertical alignment of summary values"""
+
     def __init__(self, verbose=False, recursive=False, sort=False, fix_cue=CueFix.IGNORE, covers=CoverFix.IGNORE):
         # Options
         self.verbose = verbose
@@ -150,21 +178,12 @@ class Processor:
         self.unknown = set()
 
     def summary(self):
-        print(f"total dirs:    {self.nr_dirs}")
-        print(f"media dirs:    {self.nr_media_dirs}")
-        print(f"no media dirs: {self.nr_no_media_dirs}")
-        print(f"lossless dirs: {self.nr_lossless_dirs}")
-        print(f"video files:   {self.nr_video_files}")
-        print(f"cue dirs:      {self.nr_cue}")
-        print(f"mixed dirs:    {self.nr_mixed_lossless_compressed}")
-        print(f"wrong cue:     {self.nr_wrong_cue}")
-        print(f"lossy cue:     {self.nr_lossy_cue}")
-        print(f"multiple cue:  {self.nr_multiple_cue}")
-        print(f"ignored:       {self.nr_ignored}")
-        print(f"no cover:      {self.nr_no_cover}")
-        print(f"wrong cover:   {self.nr_wrong_cover_name}")
-        if self.unknown:
-            print(f"unknown: {self.unknown}")
+        for caption, length, field in self._print_template:
+            # omit default value: must break when field names does not match template
+            value = getattr(self, field)
+            if value:
+                alignment = " " * (self._print_max - length)
+                print(f'{caption}: {alignment}{value}')
 
     @property
     def warn_covers(self):
