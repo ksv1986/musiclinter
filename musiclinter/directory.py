@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
-
-import argparse
-import logging
+import os
 from functools import cached_property
-from os import walk
 from pathlib import Path
 from typing import Generator
 
-from colorama import init
-
 from kstools.files import lowerext
+
+from .state import State
 
 # File extension categories
 # Using set type for fast "in" checks
@@ -51,18 +47,6 @@ IGNORE = (
 def count(d: dict, v: str) -> None:
     """Increase counter of value v in dictionary d"""
     d[v] = d.get(v, 0) + 1
-
-
-class State:
-    """
-    Global linting state:
-    - paths to process
-    - options
-    - common logger
-    """
-
-    logger = logging.getLogger("muslint")
-    recursive: bool = False
 
 
 def _build_analyzer():
@@ -144,7 +128,7 @@ class Directory:
     def analyze(self) -> None:
         """Enumerate all files in directory and sort them into categories"""
 
-        it = next(walk(self.path))
+        it = next(os.walk(self.path))
 
         self.subdirs = list(it[1])
         files = it[2]
@@ -196,27 +180,3 @@ class Directory:
             "distance",
         ):
             yield from visit(self, attr)
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("paths", type=str, nargs="+")
-    parser.add_argument("-r", "--recursive", action="store_true")
-    parser.parse_args(namespace=State)
-    return State
-
-
-def main():
-    init()
-    logging.basicConfig()
-    State.logger.setLevel(logging.DEBUG)
-
-    args = parse_args()
-
-    for path in args.paths:
-        d = Directory(Path(path))
-        d.log_summary(logging.INFO)
-
-
-if __name__ == "__main__":
-    main()
