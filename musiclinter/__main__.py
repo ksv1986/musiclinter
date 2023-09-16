@@ -17,6 +17,12 @@ def parse_args():
     return ml.State
 
 
+def log(d: ml.Directory):
+    d.log_summary(logging.INFO)
+    for c in d.children:
+        log(c)
+
+
 def main():
     init()
     logging.basicConfig()
@@ -26,7 +32,7 @@ def main():
 
     for path in args.paths:
         d = ml.Directory(pathlib.Path(path))
-        d.log_summary(logging.INFO)
+        log(d)
 
 
 if __name__ == "__main__":
