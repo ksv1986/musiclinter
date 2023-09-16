@@ -1,7 +1,7 @@
 import os
 from functools import cached_property
 from pathlib import Path
-from typing import Generator
+from typing import Iterator
 
 from kstools.files import lowerext
 
@@ -122,6 +122,7 @@ class Directory:
         """Subdirectory names"""
         self.children = None
         """If recursive processing is on, child directories for each subdir"""
+        self.linters = []
 
         self.analyze()
 
@@ -160,6 +161,11 @@ class Directory:
         if self.recursive:
             self.children = [Directory(Path(self.path, d), self) for d in self.subdirs]
 
+        for cls in State.linters:
+            linter = cls()
+            linter.lint(self)
+            self.linters.append(linter)
+
     def analyze_file(self, name: str) -> None:
         """
         Fast method:
@@ -176,8 +182,11 @@ class Directory:
             self.logger.log(level, line)
         for ext, nr in self.unknown.items():
             self.logger.log(level, f"\t{ext}: {nr}")
+        for linter in self.linters:
+            for line in linter.summary():
+                self.logger.log(level, line)
 
-    def summary(self, brief: bool = True) -> Generator[str, None, None]:
+    def summary(self, brief: bool = True) -> Iterator[str]:
         """Yields readable presentation of directory state line-by-line"""
         yield f"{self.path}:"
 
