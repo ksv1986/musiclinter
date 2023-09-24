@@ -3,6 +3,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Iterator
 
+from colorama import Fore
 from kstools.files import lowerext
 
 from .state import State
@@ -175,6 +176,13 @@ class Directory:
         ext = lowerext(name)
         f = self._analyzer.get(ext, lambda d, ext, _: count(d.unknown, ext))
         f(self, ext, name)
+
+    def pretty(self, name: str) -> str:
+        """Return directory path and file name highlighted in different colors"""
+        return f"{Fore.WHITE}{self.path}{os.path.sep}{Fore.CYAN}{name}{Fore.RESET}"
+
+    def fullpath(self, *args) -> Path:
+        return Path(self.path, *args)
 
     def log_summary(self, level: int) -> None:
         """Logs directory state with given logging level"""
