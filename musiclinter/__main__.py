@@ -7,6 +7,7 @@ import pathlib
 from colorama import init
 
 from . import Directory, State
+from .covers import CoverLinter
 from .cue import CueLinter
 
 
@@ -43,7 +44,10 @@ Examples:
     --cue delete
     --cue fix,overwrite"""
     parser.add_argument("--cue", type=parse_cue, help=help)
+    parser.add_argument("--covers", action="store_true")
     parser.parse_args(namespace=State)
+    if State.covers:
+        State.enable(CoverLinter)
     return State
 
 

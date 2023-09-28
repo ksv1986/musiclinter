@@ -177,9 +177,10 @@ class Directory:
         f = self._analyzer.get(ext, lambda d, ext, _: count(d.unknown, ext))
         f(self, ext, name)
 
-    def pretty(self, name: str) -> str:
+    def pretty(self, name: str = None) -> str:
         """Return directory path and file name highlighted in different colors"""
-        return f"{Fore.WHITE}{self.path}{os.path.sep}{Fore.CYAN}{name}{Fore.RESET}"
+        pretty_name = f"{os.path.sep}{Fore.CYAN}{name}" if name else ""
+        return f"{Fore.WHITE}{self.path}{pretty_name}{Fore.RESET}"
 
     def fullpath(self, *args) -> Path:
         return Path(self.path, *args)
