@@ -32,13 +32,31 @@ IMAGES = (
     "png",
     "tiff",
 )
+VIDEOS = (
+    "avi",
+    "asf",
+    "flv",
+    "m1v",
+    "m2v",
+    "m4v",
+    "mkv",
+    "mov",
+    "mp4",
+    "mpeg",
+    "mpg",
+    "ts",
+    "vob",
+    "webm",
+    "wmv",
+)
 PLAYLIST = (
     "m3u",
     "m3u8",
 )
 IGNORE = (
     "",
-    "avi",
+    "ifo",
+    "bup",
     "log",
     "txt",
 )
@@ -67,6 +85,8 @@ def _build_analyzer():
         analyzer[e] = lambda d, _ext, name: d.compressed.append(name)
     for e in IMAGES:
         analyzer[e] = lambda d, _ext, name: d.images.append(name)
+    for e in VIDEOS:
+        analyzer[e] = lambda d, _ext, name: d.videos.append(name)
     for e in PLAYLIST:
         analyzer[e] = lambda d, _ext, name: d.playlist.append(name)
     for e in ("cue",):
@@ -92,6 +112,7 @@ class Directory:
         self.compressed = []
         self.cue = []
         self.images = []
+        self.videos = []
         self.playlist = []
         self.ignored = 0
         """Number of known and ignored files"""
@@ -165,6 +186,7 @@ class Directory:
             "compressed",
             "cue",
             "images",
+            "videos",
             "ignored",
             "unknown",
             "subdirs",
