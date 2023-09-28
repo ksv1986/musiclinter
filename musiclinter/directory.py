@@ -160,14 +160,6 @@ class Directory:
         """Yields readable presentation of directory state line-by-line"""
         yield f"{self.path}:"
 
-        def visit(self, attr: str):
-            """If brief is true, yield only if attribute value is not empty"""
-            val = getattr(self, attr)
-            if not brief or val:
-                if isinstance(val, list) or isinstance(val, dict):
-                    val = len(val)
-                yield f"{attr}: {val}"
-
         for attr in (
             "lossless",
             "compressed",
@@ -179,4 +171,10 @@ class Directory:
             "depth",
             "distance",
         ):
-            yield from visit(self, attr)
+            val = getattr(self, attr)
+            if brief and not val:
+                continue
+
+            if isinstance(val, list) or isinstance(val, dict):
+                val = len(val)
+            yield f"{attr}: {val}"
