@@ -150,20 +150,28 @@ class Converter:
 
         c = Cue(str(path), path.read_bytes())
 
-        c.genre = c.genre or self.genre
-        c.date = year_string(c.date, self.year)
+        performer = c.performer
+        genre = c.genre or self.genre
+        album = c.title
+        date = year_string(c.date, self.year)
 
-        album_dir = c.title
-        if c.date:
-            album_dir = " - ".join((c.date, album_dir)) if album_dir else c.date
+        # Strip spaces
+        performer = performer.strip()
+        genre = genre.strip()
+        album = album.strip()
+        date = date.strip()
+
+        album_dir = album
+        if date:
+            album_dir = " - ".join((date, album_dir)) if album_dir else date
         album_dir = album_dir or self.timestamp()
 
-        dest = PurePath(c.performer) / album_dir
+        dest = PurePath(performer) / album_dir
         L.debug(f"dest={dest}")
-        L.debug(f"artist={c.performer}")
+        L.debug(f"artist={performer}")
         L.debug(f"album={album_dir}")
-        L.debug(f"date={some(c.date)}")
-        L.debug(f"genre={some(c.genre)}")
+        L.debug(f"date={some(date)}")
+        L.debug(f"genre={some(genre)}")
 
         dest = self.destination / dest
         dest.mkdir(parents=True)
@@ -186,25 +194,29 @@ class Converter:
 
         ext = enc.ext()
         for t in c.tracks:
+            # Strip spaces
+            if t.performer:
+                t.performer = t.performer.strip()
+            t.title = t.title.strip()
+
             # File name matches %n
             name = f"{t.index:02}.{ext}"
             file = dest / name
-
             # Add tags to split and encoded tracks
             with TagFile(file, save_on_exit=True) as f:
-                f.tags["ALBUM"] = c.title
+                f.tags["ALBUM"] = album
                 f.tags["TRACKNUMBER"] = f"{t.index:02}"
                 f.tags["TITLE"] = t.title
 
-                if not t.performer or t.performer == c.performer:
-                    f.tags["ARTIST"] = c.performer
+                if not t.performer or t.performer == performer:
+                    f.tags["ARTIST"] = performer
                 else:
                     f.tags["ARTIST"] = t.performer
-                    f.tags["ALBUMARTIST"] = c.performer
+                    f.tags["ALBUMARTIST"] = performer
                 if c.date:
-                    f.tags["DATE"] = str(c.date)
+                    f.tags["DATE"] = str(date)
                 if c.genre:
-                    f.tags["GENRE"] = c.genre
+                    f.tags["GENRE"] = genre
 
             # Choose desired final name for encoded file and rename
             track_artist = ""

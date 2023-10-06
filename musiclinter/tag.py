@@ -7,7 +7,9 @@ from taglib import File as TagFile
 
 def gettag(f: TagFile, name: str) -> str:
     v = f.tags.get(name, [""])
-    return v[0] if isinstance(v, list) else str(v)
+    if isinstance(v, list):
+        v = v[0]
+    return str(v).strip()
 
 
 def guess_tracknumber(name: str) -> str:
@@ -37,7 +39,7 @@ class Tag:
 
     def read(path: Path, /, year: str = "", genre: str = "") -> Self:
         with TagFile(path) as f:
-            title = gettag(f, "TITLE") or path.stem
+            title = gettag(f, "TITLE") or path.stem.strip()
             return Tag(
                 path,
                 gettag(f, "TRACKNUMBER") or guess_tracknumber(path.stem),
@@ -45,6 +47,6 @@ class Tag:
                 gettag(f, "ARTIST"),
                 gettag(f, "ALBUMARTIST"),
                 gettag(f, "ALBUM"),
-                gettag(f, "DATE") or year,
-                gettag(f, "GENRE") or genre,
+                gettag(f, "DATE") or year.strip(),
+                gettag(f, "GENRE") or genre.strip(),
             )
