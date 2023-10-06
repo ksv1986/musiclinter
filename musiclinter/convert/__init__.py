@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from multiprocessing import cpu_count
 from pathlib import Path, PurePath
 from subprocess import check_call
 
@@ -118,22 +120,23 @@ class Converter:
         get_name = va_name if multi_artist else single_name
 
         enc = self.enc
-        for t in tags:
-            name = safe_name(get_name(t)) + "." + enc.ext()
-            out = dest / name
+        with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
+            for t in tags:
+                name = safe_name(get_name(t)) + "." + enc.ext()
+                out = dest / name
 
-            L.info(f"{t.path.stem} -> {name}")
-            cmd = [
-                "ffmpeg",
-                "-hide_banner",
-                "-loglevel",
-                "1",
-                "-i",
-                t.path,
-                *enc.ffmpeg_args(),
-                out,
-            ]
-            check_call(cmd)
+                L.info(f"{t.path.stem} -> {name}")
+                cmd = [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "1",
+                    "-i",
+                    t.path,
+                    *enc.ffmpeg_args(),
+                    out,
+                ]
+                pool.submit(check_call, cmd)
 
         return dest
 
