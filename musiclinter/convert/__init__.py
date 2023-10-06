@@ -138,6 +138,9 @@ class Converter:
                 ]
                 pool.submit(check_call, cmd)
 
+        # ffmpeg leaves terminal with invisible cursor, reset tty
+        check_call(["stty", "sane"])
+
         return dest
 
     def convert_cue(self, source: Path, lossless: list[str], cues: list[str]) -> Path:
