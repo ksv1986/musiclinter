@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from multiprocessing import cpu_count
 from pathlib import Path, PurePath
+from shutil import copyfile
 from subprocess import check_call
 
 from kstools.cue import Cue
@@ -76,6 +77,17 @@ class Converter:
 
     def timestamp(self) -> str:
         return f"{datetime.now():%Y-%m-%d %H-%M}"
+
+    def copyfile(self, src: Path, dst: Path) -> None:
+        msg = f"{src.name}"
+        if src.name != dst.name:
+            msg += f" → {dst.name}"
+        L.info(msg)
+        copyfile(src, dst)
+
+    def copy_images(self, source: Path, dest: Path, images: list[str]) -> None:
+        for image in images:
+            self.copyfile(source / image, dest / image)
 
     def convert_lossless(self, source: Path, files: list[str]) -> Path:
         year = year_string(source.name, self.year)
@@ -243,6 +255,10 @@ class Converter:
         L.debug(msg)
 
         if len(d.lossless) > 1 or not d.cue:
-            return self.convert_lossless(source, d.lossless)
+            dest = self.convert_lossless(source, d.lossless)
+        else:
+            dest = self.convert_cue(source, d.lossless, d.cue)
 
-        return self.convert_cue(source, d.lossless, d.cue)
+        self.copy_images(source, dest, d.images)
+
+        return dest
