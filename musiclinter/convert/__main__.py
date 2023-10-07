@@ -33,7 +33,7 @@ def parse_args():
     from argparse import ArgumentParser
 
     p = ArgumentParser("musiconv")
-    p.add_argument("source", type=Path)
+    p.add_argument("source", nargs="+", type=Path)
     p.add_argument("-d", "--dest", type=Path)
     p.add_argument("-r", "--recursive", action="store_true")
     return p.parse_args()
@@ -46,12 +46,11 @@ def main():
     args = parse_args()
 
     conv = Converter()
-    conv.destination = args.dest or args.source
 
-    if args.recursive:
-        return convert_recursive(conv, args.source)
-    else:
-        return convert_single(conv, args.source)
+    convert = convert_recursive if args.recursive else convert_single
+    for path in args.source:
+        conv.destination = args.dest or path
+        convert(conv, path)
 
 
 if __name__ == "__main__":
