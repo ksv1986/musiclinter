@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 from pathlib import Path, PurePath
 from shutil import copyfile
 from subprocess import check_call
+from typing import Callable, Tuple
 
 from kstools.cue import Cue
 
@@ -23,10 +24,6 @@ NONE = "-"
 
 
 class NotDir(Exception):
-    pass
-
-
-class Lossy(Exception):
     pass
 
 
@@ -69,6 +66,10 @@ def va_name(t: Tag) -> str:
     return name_prefix(t) + t.artist + " - " + t.title
 
 
+NameFn = Callable[[Tag], str]
+ParsedTags = Tuple[Path, list[Tag], NameFn]
+
+
 class Converter:
     destination: Path = None
     genre: str = ""
@@ -89,7 +90,7 @@ class Converter:
         for image in images:
             self.copyfile(source / image, dest / image)
 
-    def convert_lossless(self, source: Path, files: list[str]) -> Path:
+    def read_tags(self, source: Path, files: list[str]) -> ParsedTags:
         year = year_string(source.name, self.year)
         tags = [Tag.read(source / f, year=year, genre=self.genre) for f in files]
 
@@ -127,9 +128,13 @@ class Converter:
         L.debug(f"genre={some(prev_genre, multi_genre)}")
 
         dest = self.destination / dest
-        dest.mkdir(parents=True)
-
         get_name = va_name if multi_artist else single_name
+
+        return dest, tags, get_name
+
+    def convert_lossless(self, source: Path, files: list[str]) -> Path:
+        dest, tags, get_name = self.read_tags(source, files)
+        dest.mkdir(parents=True)
 
         enc = self.enc
         with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
@@ -152,6 +157,17 @@ class Converter:
 
         # ffmpeg leaves terminal with invisible cursor, reset tty
         check_call(["stty", "sane"])
+
+        return dest
+
+    def copy_lossy(self, source: Path, lossy: list[str]) -> Path:
+        dest, tags, get_name = self.read_tags(source, lossy)
+        dest.mkdir(parents=True)
+
+        for t in tags:
+            name = safe_name(get_name(t))
+            out = dest / (name + t.path.suffix)
+            self.copyfile(t.path, out)
 
         return dest
 
@@ -248,13 +264,12 @@ class Converter:
         if not d.lossless and not d.compressed:
             return
 
-        if d.compressed:
-            raise Lossy(f"{source}: {len(d.compressed)} compressed files")
-
         msg = source.absolute().name if str(source) == "." else source
         L.debug(msg)
 
-        if len(d.lossless) > 1 or not d.cue:
+        if d.compressed:
+            dest = self.copy_lossy(source, d.compressed)
+        elif len(d.lossless) > 1 or not d.cue:
             dest = self.convert_lossless(source, d.lossless)
         else:
             dest = self.convert_cue(source, d.lossless, d.cue)

@@ -6,7 +6,6 @@ from subprocess import CalledProcessError
 from . import (
     Converter,
     L,
-    Lossy,
 )
 
 
@@ -15,7 +14,6 @@ def convert_single(conv: Converter, path: Path) -> None:
         conv.convert_dir(path)
     except (
         CalledProcessError,
-        Lossy,
         NotImplementedError,
         FileExistsError,
     ) as ex:
